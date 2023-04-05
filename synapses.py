@@ -15,18 +15,24 @@ class DiehlAndCookSynapses(b2.Synapses):
         post_neuron_group,
         conn_type,
         stdp_on=False,
+        stp_on=False,
         stdp_rule="original",
+        stp_rule="markham",
         custom_namespace=None,
         nu_factor=None,
     ):
         self.pre_conn_type = conn_type[0]
         self.post_conn_type = conn_type[1]
         self.stdp_rule = stdp_rule
+        self.stp_rule = stp_rule
         self.namespace = {}
         self.create_equations()
         if stdp_on:
             self.create_stdp_namespace()
             self.create_stdp_equations()
+        if stp_on:
+            self.create_stp_namespace()
+            self.create_stp_equations()
         if nu_factor is not None:
             for k in self.namespace:
                 if "nu" in k:
@@ -108,6 +114,67 @@ class DiehlAndCookSynapses(b2.Synapses):
                 "tar": 0.5,  # complete guess!
                 "mu": 3.0,  # complete guess!
             }
+
+    def create_stp_namespace(self):
+        if self.stp_rule == "tsodyks":
+            self.namespace = {
+                "w_e": 0.05 * b2.nS,  # Excitatory synaptic conductance
+                "w_i": 1.0 * b2.nS,  # Inhibitory synaptic conductance
+                "U_0": 0.6,  # Synaptic release probability at rest
+                "Omega_d": 2.0 / b2.second,  # Synaptic depression rate
+                "Omega_f": 3.33 / b2.second,  # Synaptic facilitation rate
+                "wmax_ee": 1.0,
+            }
+        elif self.stp_rule == "markham":
+            self.namespace = {
+                "taud": 100 * b2.ms,
+                "tauf": 5 * b2.ms,
+                "U": 0.6,
+                "wmax_ee": 1.0,
+                "lr": 0.0001,
+            }
+        elif self.stp_rule == "moraitis":
+            self.namespace = {
+                "tc_lambda": 300 * b2.ms,
+                "gamma": 0.7,
+                "tc_pre": 20 * b2.ms,
+                "tc_post": 20 * b2.ms,
+                "wmax_ee": 1.0,
+            }
+    def create_stp_equations(self):
+        if self.stp_rule == "tsodyks":
+            self.model += '''   
+                # Usage of releasable neurotransmitter per single action potential:
+                du_S/dt = -Omega_f * u_S     : 1 (event-driven)
+                # Fraction of synaptic neurotransmitter resources available:
+                dx_S/dt = Omega_d *(1 - x_S) : 1 (event-driven)'''
+            self.pre_eqn += '''
+                u_S += U_0 * (1 - u_S)
+                r_S = u_S * x_S
+                x_S -= r_S
+                w = clip(w + w_e*r_S, 0 , wmax_ee)'''
+
+        elif self.stp_rule == "markham":
+            self.model += '''
+                dx/dt = (1-x) / taud : 1 (event-driven)
+                du/dt = (U-u) / tauf : 1 (event-driven) '''
+            self.pre_eqn += '''
+            w = clip(w + u * x * w * lr, 0 , wmax_ee)
+            x = x * (1 - u)
+            u = u + U * (1 - u)'''
+
+        elif self.stp_rule == "moraitis":
+            self.model += '''
+                # pre, post - pre and postsynaptic traces
+
+                dpre/dt = -pre/ tc_pre  : 1 (event-driven)
+                dpost/dt  = -post / tc_post  : 1 (event-driven)
+
+                df/dt = -f/tc_lambda : 1 (event-driven)
+            '''
+            self.pre_eqn = '''
+            g{}_post = w + f
+            f += gamma*pre*post'''.format(self.pre_conn_type)
 
     def create_stdp_equations(self):
         if self.stdp_rule == "original":

@@ -146,7 +146,7 @@ def main(**kwargs):
             outputpath,
             exist_ok=(kwargs["clobber"] or kwargs["resume"] or kwargs["test_mode"]),
         )
-    except (OSError, FileExistsError):
+    except (OSError, FileExistsError) as e:
         print(f"Refusing to overwrite existing output files in {outputpath}")
         print(f"Use --clobber to force overwriting")
         exit(8)
@@ -159,7 +159,7 @@ def main(**kwargs):
     else:
         mode = "w"
     logfilename = os.path.join(outputpath, f"output{suffix}.log")
-    fh = logging.FileHandler(logfilename, mode)
+    fh = logging.FileHandler(logfilename, mode, "utf-8")
     fh.setLevel(logging.DEBUG if kwargs["debug"] else logging.INFO)
     formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
     fh.setFormatter(formatter)
@@ -188,6 +188,8 @@ def simulation(
     size=400,
     resume=False,
     stdp_rule="original",
+    stp_rule="markham",
+    stp_on=False,
     custom_namespace=None,
     timer=None,
     tc_theta=None,
@@ -209,6 +211,7 @@ def simulation(
         random_weights = False
         use_premade_weights = True
         ee_STDP_on = False
+        ee_STP_on = stp_on
         if num_epochs is None:
             num_epochs = 1
         if progress_interval is None:
@@ -220,6 +223,7 @@ def simulation(
     else:
         random_weights = not resume
         ee_STDP_on = True
+        ee_STP_on = False
         if num_epochs is None:
             num_epochs = 3
         if progress_interval is None:
@@ -514,13 +518,16 @@ def simulation(
             postName = name[1] + connType[1]
             connName = preName + postName
             stdp_on = ee_STDP_on and connName in stdp_conn_names
+            stp_on = ee_STP_on
             nu_factor = 10.0 if name in ["AO"] else None
             conn = connections[connName] = DiehlAndCookSynapses(
                 neuron_groups[preName],
                 neuron_groups[postName],
                 conn_type=connType,
                 stdp_on=stdp_on,
+                stp_on=stp_on,
                 stdp_rule=stdp_rule,
+                stp_rule=stp_rule,
                 custom_namespace=custom_namespace,
                 nu_factor=nu_factor,
             )
@@ -884,6 +891,21 @@ if __name__ == "__main__":
         ],
     )
     parser.add_argument(
+        "--stp_rule",
+        type=str,
+        default="markham",
+        choices=[
+            "markham",
+            "tsodyks",
+            "moraitis"
+        ],
+    )
+    parser.add_argument(
+        "--stp_on",
+        type=bool,
+        default=False
+    )
+    parser.add_argument(
         "--custom_namespace",
         "--synapse_namespace",
         type=str,
@@ -969,6 +991,8 @@ if __name__ == "__main__":
             size=args.size,
             resume=args.resume,
             stdp_rule=args.stdp_rule,
+            stp_rule=args.stp_rule,
+            stp_on=args.stp_on,
             custom_namespace=custom_namespace_arg,
             timer=args.timer,
             tc_theta=args.tc_theta,
