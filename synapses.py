@@ -118,12 +118,11 @@ class DiehlAndCookSynapses(b2.Synapses):
     def create_stp_namespace(self):
         if self.stp_rule == "tsodyks":
             self.namespace = {
-                "w_e": 0.05 * b2.nS,  # Excitatory synaptic conductance
-                "w_i": 1.0 * b2.nS,  # Inhibitory synaptic conductance
                 "U_0": 0.6,  # Synaptic release probability at rest
                 "Omega_d": 2.0 / b2.second,  # Synaptic depression rate
                 "Omega_f": 3.33 / b2.second,  # Synaptic facilitation rate
                 "wmax_ee": 1.0,
+                "lr": 0.0001,
             }
         elif self.stp_rule == "markham":
             self.namespace = {
@@ -140,6 +139,7 @@ class DiehlAndCookSynapses(b2.Synapses):
                 "tc_pre": 20 * b2.ms,
                 "tc_post": 20 * b2.ms,
                 "wmax_ee": 1.0,
+                "lr": 0.0001,
             }
     def create_stp_equations(self):
         if self.stp_rule == "tsodyks":
@@ -152,7 +152,7 @@ class DiehlAndCookSynapses(b2.Synapses):
                 u_S += U_0 * (1 - u_S)
                 r_S = u_S * x_S
                 x_S -= r_S
-                w = clip(w + w_e*r_S, 0 , wmax_ee)'''
+                w = clip(w + w*r_S*lr, 0 , wmax_ee)'''
 
         elif self.stp_rule == "markham":
             self.model += '''
