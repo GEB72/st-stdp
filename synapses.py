@@ -126,33 +126,36 @@ class DiehlAndCookSynapses(b2.Synapses):
             }
         elif self.stp_rule == "markham":
             self.namespace = {
-                "taud": 100 * b2.ms,
-                "tauf": 5 * b2.ms,
+                "taud": 400 * b2.ms,
+                "tauf": 2 * b2.ms,
                 "U": 0.6,
                 "wmax_ee": 1.0,
                 "lr": 0.0001,
             }
         elif self.stp_rule == "moraitis":
             self.namespace = {
-                "tc_lambda": 300 * b2.ms,
-                "gamma": 0.7,
-                "tc_pre": 20 * b2.ms,
-                "tc_post": 20 * b2.ms,
+                "tc_pre_ee": 20 * b2.ms,
+                "tc_post_1_ee": 20 * b2.ms,
+                "tc_post_2_ee": 40 * b2.ms,
+                "nu_ee_pre": 0.0001,
+                "nu_ee_post": 0.01,
                 "wmax_ee": 1.0,
-                "lr": 0.0001,
+                "tc_lambda": 300 * b2.ms,
+                "lr_pre": 0.0001,
+                "lr_post": 0.01,
             }
     def create_stp_equations(self):
         if self.stp_rule == "tsodyks":
             self.model += '''   
                 # Usage of releasable neurotransmitter per single action potential:
-                du_S/dt = -Omega_f * u_S     : 1 (event-driven)
+                du/dt = -Omega_f * u     : 1 (event-driven)
                 # Fraction of synaptic neurotransmitter resources available:
-                dx_S/dt = Omega_d *(1 - x_S) : 1 (event-driven)'''
+                dx/dt = Omega_d * (1 - x) : 1 (event-driven)'''
             self.pre_eqn += '''
-                u_S += U_0 * (1 - u_S)
-                r_S = u_S * x_S
-                x_S -= r_S
-                w = clip(w + w*r_S*lr, 0 , wmax_ee)'''
+                u += U_0 * (1 - u)
+                r = u * x
+                x -= r
+                w = clip(w + w * r * lr, 0 , wmax_ee)'''
 
         elif self.stp_rule == "markham":
             self.model += '''
@@ -164,17 +167,26 @@ class DiehlAndCookSynapses(b2.Synapses):
             u = u + U * (1 - u)'''
 
         elif self.stp_rule == "moraitis":
-            self.model += '''
-                # pre, post - pre and postsynaptic traces
-
-                dpre/dt = -pre/ tc_pre  : 1 (event-driven)
-                dpost/dt  = -post / tc_post  : 1 (event-driven)
-
+            self.model += b2.Equations(
+                """
+                dpre/dt = -pre/(tc_pre_ee)  : 1 (event-driven)
+                dpost1/dt  = -post1/(tc_post_1_ee)  : 1 (event-driven)
+                dpost2/dt  = -post2/(tc_post_2_ee)  : 1 (event-driven)
+                
                 df/dt = -f/tc_lambda : 1 (event-driven)
-            '''
-            self.pre_eqn = '''
-            g{}_post = w + f
-            f += gamma*pre*post'''.format(self.pre_conn_type)
+                """
+            )
+            self.pre_eqn += """
+                pre = 1.
+                f = clip(f + nu_ee_pre * post1, 0, wmax_ee)
+                w = clip(w + f*lr_pre, 0, wmax_ee)
+                """
+            self.post_eqn += """
+                f = clip(f + nu_ee_post * pre * post2, 0, wmax_ee)
+                w = clip(w + f*lr_post, 0 ,wmax_ee)
+                post1 = 1.
+                post2 = 1.
+                """
 
     def create_stdp_equations(self):
         if self.stdp_rule == "original":

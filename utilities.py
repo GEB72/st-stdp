@@ -22,6 +22,8 @@ import matplotlib.patheffects as path_effects
 
 import pandas as pd
 
+import re
+
 from IPython import embed
 
 
@@ -568,3 +570,64 @@ def create_test_store(storefilename, originalstorefilename):
 def float_or_none(x):
     if not (x is None or x.lower() == "none"):
         return float(x)
+
+# directory names
+baseline_dir = "output_stdp/"
+stp_markham_dir = "output_stp_markham/"
+stp_tsodyks_dir = "output_stp_tsodyks/"
+stp_moraitis_dir = "output_stp_moraitis/"
+save_dir = "./comparison_graphs/%s.png"
+
+def read_test_log_file(directory):
+    # construct full path to log file
+    root = "./runs/"
+    target = "output_test.log"
+    path = root + directory + target
+
+    # phrase used to find lines containing accuracies from log file
+    phrase = "spiking-mnist - INFO - Accuracy [Ae]:"
+
+    # regexes for file formatting
+    accuracy_regex = "\\d+(?:\\.\\d+)?"
+    confidence_regex = "([0-9.]+–+[0-9.]*)"
+
+    # open file
+    with open(path, encoding="utf-8") as file:
+        file = file.readlines()
+
+    # extract lines containing phrase, store values in list of dictionaries
+    values = list()
+    for line in file:
+        if phrase in line:
+            # dictionary of accuracy and confidence range
+            value_dict = {}
+
+            # get accuracy and store in dictionary
+            accuracy = re.findall(accuracy_regex, line)[0]
+            value_dict["accuracy"] = float(accuracy)
+
+            # get confidence range and store in dictionary
+            confidence_range = re.findall(confidence_regex, line)[0]
+            confidence_range = confidence_range.split("–")
+            value_dict["confidence_ramge"] = confidence_range
+
+            values.append(value_dict)
+    return values
+
+def add_graph():
+
+    fig, ax = plt.subplots()
+
+    ax.set_ylim(85,92.5)
+    ax.get_xaxis().set_visible(False)
+
+def add_values_to_graph(values, name):
+    # get accuracies
+    accuracy = [x["accuracy"] for x in values]
+
+    plt.plot(accuracy, label=name)
+
+def show_and_save_graph():
+    plt.legend()
+    path = save_dir % "graph"
+    plt.savefig(path, dpi=300)

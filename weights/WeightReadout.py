@@ -58,7 +58,9 @@ black = '#000000'    #
 my_cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
     'own2', [bright_grey, black])
 
-n_input = 784
+# for n-mnist
+# n_input = 1156
+n_input = 1156
 n_e = 400
 
 for name in readoutnames:

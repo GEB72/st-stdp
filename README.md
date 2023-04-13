@@ -27,7 +27,7 @@ conda env create -f environment.yml
 
 A test using pre-trained weights (intended to reproduce that of the original Brian 1 code), may be achieved by running:
 ```shell
-simulation.py --test
+.\simulation.py --test
 ```
 
 The corresponding example of training the weights from scratch is available by running:
