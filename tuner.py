@@ -6,7 +6,6 @@ import simulation
 import brian2 as b2
 
 base_args = {"test_mode": True, "clobber": True, "debug": True, "output": "./runs/", "stp_on": True}
-
 search_space_markham = [Integer(100, 500, name="taud_msec"),
                         Integer(1, 5, name="tauf_msec"),
                         Real(0.2, 0.8, name="U")]
