@@ -1,5 +1,7 @@
 import logging
 
+from keras.layers import GaussianNoise
+
 logging.captureWarnings(True)
 log = logging.getLogger("spiking-mnist")
 
@@ -38,7 +40,26 @@ def get_labeled_data():
     with np.load(localfilename) as f:
         training = {"x": f["x_train"], "y": f["y_train"]}
         testing = {"x": f["x_test"], "y": f["y_test"]}
+
+    testing["x"] = apply_gaussian_noise(testing["x"], 176.)
     return training, testing
+
+
+def apply_gaussian_noise(x_data, std):
+    # get dimensions of data
+    datapoints = x_data.shape[0]
+    rows = x_data.shape[1]
+    columns = x_data.shape[2]
+
+    # set random seed
+    np.random.seed(0)
+
+    # get noise values
+    noise = np.random.normal(0, std, (datapoints, rows, columns))
+
+    # add noise to data, restricting values between 0 and 1
+    noisy_x = np.clip(x_data + noise, 0., 255.)
+    return noisy_x
 
 
 def get_matrix_from_file(filename, shape=None):
@@ -90,7 +111,7 @@ def rearrange_weights(weights):
         for j in range(n_e_sqrt):
             wk = weights[:, i + j * n_e_sqrt].reshape((n_in_sqrt, n_in_sqrt))
             rearranged_weights[
-                i * n_in_sqrt : (i + 1) * n_in_sqrt, j * n_in_sqrt : (j + 1) * n_in_sqrt
+            i * n_in_sqrt: (i + 1) * n_in_sqrt, j * n_in_sqrt: (j + 1) * n_in_sqrt
             ] = wk
     return rearranged_weights, n_in_sqrt, n_e_sqrt
 
@@ -104,22 +125,22 @@ def rearrange_output_weights(weights):
     rearranged_weights = np.zeros((num_values_col, num_values_row))
     for i in range(n_output):
         wk = weights[:, i].reshape((n_e_sqrt, n_e_sqrt)).T
-        rearranged_weights[:, i * n_e_sqrt : (i + 1) * n_e_sqrt] = wk
+        rearranged_weights[:, i * n_e_sqrt: (i + 1) * n_e_sqrt] = wk
     return rearranged_weights, n_e_sqrt, n_output
 
 
 def plot_weights(
-    weights,
-    assignments=None,
-    theta=None,
-    max_weight=1.0,
-    ax=None,
-    filename=None,
-    return_artists=False,
-    nseen=None,
-    output=False,
-    feedback=False,
-    label="",
+        weights,
+        assignments=None,
+        theta=None,
+        max_weight=1.0,
+        ax=None,
+        filename=None,
+        return_artists=False,
+        nseen=None,
+        output=False,
+        feedback=False,
+        label="",
 ):
     log.debug(f"Plotting weights {label}")
     log.debug(f"output={output}, feedback={feedback}")
@@ -216,7 +237,7 @@ def plot_weights(
 
 
 def plot_quantity(
-    quantity=None, max_quantity=None, ax=None, filename=None, label="", nseen=None
+        quantity=None, max_quantity=None, ax=None, filename=None, label="", nseen=None
 ):
     if isinstance(quantity, pd.Series):
         quantity = quantity.values
@@ -324,7 +345,7 @@ def rreplace(s, old, new, occurrence=1):
 
 
 def spike_counts_from_cumulative(
-    cumulative_spike_counts, n_data, n_tbin, n_neurons, start=0, end=None, atmost=None
+        cumulative_spike_counts, n_data, n_tbin, n_neurons, start=0, end=None, atmost=None
 ):
     log.debug("Producing spike counts from cumulative counts")
     # log.debug(f"cumulative_spike_counts:\n{cumulative_spike_counts}")
@@ -552,10 +573,10 @@ def record_arguments(frame, values):
 
 def create_test_store(storefilename, originalstorefilename):
     with pd.HDFStore(
-        originalstorefilename, mode="r", complib="blosc", complevel=9
+            originalstorefilename, mode="r", complib="blosc", complevel=9
     ) as originalstore:
         with pd.HDFStore(
-            storefilename, mode="w", complib="blosc", complevel=9
+                storefilename, mode="w", complib="blosc", complevel=9
         ) as store:
             for k in originalstore.root._v_attrs._v_attrnamesuser:
                 store.root._v_attrs[k] = originalstore.root._v_attrs[k]
@@ -571,17 +592,27 @@ def float_or_none(x):
     if not (x is None or x.lower() == "none"):
         return float(x)
 
+
 # directory names
 baseline_dir = "output_stdp/"
+
 stp_markham_dir = "output_stp_markham/"
 stp_tsodyks_dir = "output_stp_tsodyks/"
+stp_tsodyks_dir_f = "output_stp_tsodyks_omega_f/"
+stp_tsodyks_dir_d = "output_stp_tsodyks_omega_d/"
 stp_moraitis_dir = "output_stp_moraitis/"
+stdp_tsodyks_dir = "output_stdp_tsodyks/"
+
 save_dir = "./comparison_graphs/%s.png"
 
-def read_test_log_file(directory):
+
+def read_test_log_file(directory, test=True):
     # construct full path to log file
     root = "./runs/"
-    target = "output_test.log"
+    if test:
+        target = "output_test.log"
+    else:
+        target = "output.log"
     path = root + directory + target
 
     # phrase used to find lines containing accuracies from log file
@@ -614,12 +645,13 @@ def read_test_log_file(directory):
             values.append(value_dict)
     return values
 
-def add_graph():
 
+def add_graph(upper_y, lower_y):
     fig, ax = plt.subplots()
 
-    ax.set_ylim(85,92.5)
+    ax.set_ylim(upper_y, lower_y)
     ax.get_xaxis().set_visible(False)
+
 
 def add_values_to_graph(values, name):
     # get accuracies
@@ -627,7 +659,51 @@ def add_values_to_graph(values, name):
 
     plt.plot(accuracy, label=name)
 
-def show_and_save_graph():
+
+def show_and_save_graph(name):
     plt.legend()
-    path = save_dir % "graph"
+    path = save_dir % name
     plt.savefig(path, dpi=300)
+
+
+add_graph(60, 67.5)
+values = read_test_log_file(stp_tsodyks_dir)
+add_values_to_graph(values, "tsodyks_stp")
+values_stdp = read_test_log_file(baseline_dir)
+add_values_to_graph(values_stdp, "baseline")
+show_and_save_graph("tsodyks_more_noisy_data")
+
+# add_graph(85, 90)
+# values = read_test_log_file(stp_tsodyks_dir)
+# add_values_to_graph(values, "baseline_tsodyks")
+# values_stdp = read_test_log_file(stp_tsodyks_dir_d)
+# add_values_to_graph(values_stdp, "tsodyks_omega_d")
+# show_and_save_graph("tsodyks_omega_d")
+
+# add_graph(85, 90)
+# values = read_test_log_file(stp_tsodyks_dir)
+# add_values_to_graph(values, "tsodyks")
+# values_stdp = read_test_log_file(baseline_dir)
+# add_values_to_graph(values_stdp, "baseline_tsodyks")
+# show_and_save_graph("tsodyks_omega_f")
+
+# add_graph(80, 90)
+# values = read_test_log_file(stp_markham_dir)
+# add_values_to_graph(values, "markram")
+# values_stdp = read_test_log_file(baseline_dir)
+# add_values_to_graph(values_stdp, "baseline")
+# show_and_save_graph("markram_baseline")
+
+# add_graph()
+# values = read_test_log_file(stp_moraitis_dir)
+# add_values_to_graph(values, "moraitis")
+# values_stdp = read_test_log_file(baseline_dir)
+# add_values_to_graph(values_stdp, "baseline")
+# show_and_save_graph("moraitis_baseline")
+
+# add_graph(50, 100)
+# values = read_test_log_file(stdp_tsodyks_dir, test=False)
+# add_values_to_graph(values, "stdp_tsodyks")
+# values_stdp = read_test_log_file(baseline_dir, test=False)
+# add_values_to_graph(values_stdp, "baseline")
+# show_and_save_graph("stdp_tsodyks")

@@ -53,10 +53,11 @@ class DiehlAndCookSynapses(b2.Synapses):
         self.model = b2.Equations("w : 1")
         self.pre_eqn = "g{}_post += w".format(self.pre_conn_type)
         self.post_eqn = ""
+        self.namespace = {}
 
     def create_stdp_namespace(self):
         if self.stdp_rule == "original":
-            self.namespace = {
+            namespace_dict = {
                 "tc_pre_ee": 20 * b2.ms,
                 "tc_post_1_ee": 20 * b2.ms,
                 "tc_post_2_ee": 40 * b2.ms,
@@ -64,10 +65,11 @@ class DiehlAndCookSynapses(b2.Synapses):
                 "nu_ee_post": 0.01,
                 "wmax_ee": 1.0,
             }
+            self.namespace.update(namespace_dict)
         elif self.stdp_rule == "minimal-triplet":
             # use values corresponding to DC15 model
             # which approximate those from PG06
-            self.namespace = {
+            namespace_dict = {
                 "tc_pre": 20 * b2.ms,
                 "tc_post1": 20 * b2.ms,
                 "tc_post2": 40 * b2.ms,
@@ -75,9 +77,10 @@ class DiehlAndCookSynapses(b2.Synapses):
                 "nu_triple_post": 0.01,
                 "wmax": 1.0,
             }
+            self.namespace.update(namespace_dict)
         elif self.stdp_rule == "full-triplet":
             # these values taken from nearest-spike, visual-cortex model of PG06
-            self.namespace = {
+            namespace_dict = {
                 "tc_pre1": 16.8 * b2.ms,
                 "tc_pre2": 714 * b2.ms,
                 "tc_post1": 33.7 * b2.ms,
@@ -88,24 +91,27 @@ class DiehlAndCookSynapses(b2.Synapses):
                 "nu_triple_post": 5.3e-2,
                 "wmax": 1.0,
             }
+            self.namespace.update(namespace_dict)
         elif self.stdp_rule == "powerlaw":
-            self.namespace = {
+            namespace_dict = {
                 "tc_pre": 20 * b2.ms,
                 "nu": 0.01,
                 "wmax": 1.0,
                 "tar": 0.5,  # complete guess!
                 "mu": 3.0,  # complete guess!
             }
+            self.namespace.update(namespace_dict)
         elif self.stdp_rule == "exponential":
-            self.namespace = {
+            namespace_dict = {
                 "tc_pre": 20 * b2.ms,
                 "nu": 0.01,
                 "wmax": 1.0,
                 "tar": 0.5,  # complete guess!
                 "beta": 3.0,  # from Querlioz et al. (2013, doi:10.1109/TNANO.2013.2250995)
             }
+            self.namespace.update(namespace_dict)
         elif self.stdp_rule == "symmetric":
-            self.namespace = {
+            namespace_dict = {
                 "tc_pre": 20 * b2.ms,
                 "tc_post": 20 * b2.ms,
                 "nu_pre": 0.0001,
@@ -114,26 +120,29 @@ class DiehlAndCookSynapses(b2.Synapses):
                 "tar": 0.5,  # complete guess!
                 "mu": 3.0,  # complete guess!
             }
+            self.namespace.update(namespace_dict)
 
     def create_stp_namespace(self):
         if self.stp_rule == "tsodyks":
-            self.namespace = {
-                "U_0": 0.6,  # Synaptic release probability at rest
-                "Omega_d": 2.0 / b2.second,  # Synaptic depression rate
-                "Omega_f": 3.33 / b2.second,  # Synaptic facilitation rate
+            namespace_dict = {
+                "U_0": 0.2,  # Synaptic release probability at rest
+                "Omega_d": 0.73 / b2.second,  # Synaptic depression rate
+                "Omega_f": 5 / b2.second,  # Synaptic facilitation rate
                 "wmax_ee": 1.0,
                 "lr": 0.0001,
             }
+            self.namespace.update(namespace_dict)
         elif self.stp_rule == "markham":
-            self.namespace = {
-                "taud": 400 * b2.ms,
-                "tauf": 2 * b2.ms,
+            namespace_dict = {
+                "taud": 10 * b2.ms,
+                "tauf": 1 * b2.ms,
                 "U": 0.6,
                 "wmax_ee": 1.0,
                 "lr": 0.0001,
             }
+            self.namespace.update(namespace_dict)
         elif self.stp_rule == "moraitis":
-            self.namespace = {
+            namespace_dict = {
                 "tc_pre_ee": 20 * b2.ms,
                 "tc_post_1_ee": 20 * b2.ms,
                 "tc_post_2_ee": 40 * b2.ms,
@@ -144,6 +153,8 @@ class DiehlAndCookSynapses(b2.Synapses):
                 "lr_pre": 0.0001,
                 "lr_post": 0.01,
             }
+            self.namespace.update(namespace_dict)
+
     def create_stp_equations(self):
         if self.stp_rule == "tsodyks":
             self.model += '''   
@@ -152,9 +163,9 @@ class DiehlAndCookSynapses(b2.Synapses):
                 # Fraction of synaptic neurotransmitter resources available:
                 dx/dt = Omega_d * (1 - x) : 1 (event-driven)'''
             self.pre_eqn += '''
-                u += U_0 * (1 - u)
+                u = u + U_0 * (1 - u)
                 r = u * x
-                x -= r
+                x = x - r
                 w = clip(w + w * r * lr, 0 , wmax_ee)'''
 
         elif self.stp_rule == "markham":

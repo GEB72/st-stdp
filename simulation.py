@@ -223,7 +223,7 @@ def simulation(
     else:
         random_weights = not resume
         ee_STDP_on = True
-        ee_STP_on = False
+        ee_STP_on = stp_on
         if num_epochs is None:
             num_epochs = 3
         if progress_interval is None:
